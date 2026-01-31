@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biosphere3 — Full Lite</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: "Segoe UI", sans-serif; background: #0b1220; color: #e5e9f0; }
+        header { padding: 16px 20px; background: #111827; border-bottom: 1px solid #1f2a3a; }
+        h1 { margin: 0; font-size: 20px; color: #7dd3fc; }
+        .wrap { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .banner { background: #00ff6a; color: #000; padding: 10px 12px; border-radius: 8px; font-weight: 700; }
+        .grid { display: grid; grid-template-columns: 2fr 3fr; gap: 16px; margin-top: 16px; }
+        .panel { background: #111827; border: 1px solid #1f2a3a; border-radius: 10px; padding: 12px; }
+        canvas { width: 100%; height: 360px; display: block; background: #0b0f16; border-radius: 8px; border: 1px solid #1f2a3a; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        th, td { padding: 8px 10px; border-bottom: 1px solid #1f2a3a; font-size: 13px; }
+        th { text-transform: uppercase; font-size: 11px; color: #94a3b8; text-align: left; }
+        .status { padding: 2px 6px; border-radius: 999px; font-size: 11px; }
+        .Online { background: rgba(34,197,94,0.2); color: #22c55e; }
+        .Warning { background: rgba(251,191,36,0.2); color: #fbbf24; }
+        .Offline { background: rgba(239,68,68,0.2); color: #ef4444; }
+        .meta { color: #94a3b8; font-size: 12px; margin-top: 6px; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Biosphere3 — Full Lite (Data + 3D)</h1>
+    </header>
+    <div class="wrap">
+        <div class="banner">Full Lite rendering OK — this page has live data and a 3D-style view.</div>
+        <div class="grid">
+            <div class="panel">
+                <strong>3D Sensor View (Canvas)</strong>
+                <div class="meta">Perspective projection from PosX/PosY/PosZ</div>
+                <canvas id="sensorCanvas" width="720" height="360"></canvas>
+            </div>
+            <div class="panel">
+                <strong>Sensor Table</strong>
+                <div class="meta" id="summary">Loading...</div>
+                <div id="tableWrap"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = '/api/Sensors';
+        const canvas = document.getElementById('sensorCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function statusColor(status) {
+            if (status === 'Offline') return '#ef4444';
+            if (status === 'Warning') return '#fbbf24';
+            return '#22c55e';
+        }
+
+        function projectPoint(x, y, z) {
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const depth = 1 / (1 + (z + 10) / 20);
+            return {
+                x: cx + (x - 20) * 10 * depth,
+                y: cy + (y - 10) * 12 * depth,
+                r: 4 + 6 * depth
+            };
+        }
+
+        function drawSensors(sensors) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#0b0f16';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = 'rgba(56,189,248,0.2)';
+            for (let i = 0; i <= 12; i++) {
+                const x = (i / 12) * canvas.width;
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for (let i = 0; i <= 6; i++) {
+                const y = (i / 6) * canvas.height;
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+            sensors.forEach(s => {
+                const p = projectPoint(s.posX, s.posY, s.posZ);
+                ctx.beginPath();
+                ctx.fillStyle = statusColor(s.status);
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function renderTable(sensors) {
+            const tableWrap = document.getElementById('tableWrap');
+            const summary = document.getElementById('summary');
+            summary.textContent = `${sensors.length} sensors loaded`;
+            const rows = sensors.map(s => `
+                <tr>
+                    <td>${s.id}</td>
+                    <td>${s.name}</td>
+                    <td>${s.location}</td>
+                    <td>${s.type}</td>
+                    <td>${s.lastReading}</td>
+                    <td>${s.unit}</td>
+                    <td><span class="status ${s.status}">${s.status}</span></td>
+                </tr>
+            `).join('');
+            tableWrap.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th><th>Name</th><th>Location</th><th>Type</th>
+                            <th>Reading</th><th>Unit</th><th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+        }
+
+        fetch(API)
+            .then(r => r.json())
+            .then(data => {
+                renderTable(data);
+                drawSensors(data);
+            })
+            .catch(err => {
+                document.getElementById('summary').textContent = `Load failed: ${err.message}`;
+            });
+    </script>
+</body>
+</html>

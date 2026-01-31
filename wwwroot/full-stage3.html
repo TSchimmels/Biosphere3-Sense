@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biosphere3 Full — Stage 3</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        #stageMarker { background: #00ff6a; color: #000; padding: 10px 12px; font-weight: 700; }
+    </style>
+</head>
+<body>
+    <div id="stageMarker">Stage 3 OK — CSS + legacy JS.</div>
+    <header class="app-header">
+        <div class="brand">
+            <div class="brand-mark">B3</div>
+            <div class="brand-text">
+                <h1>Biosphere3</h1>
+                <p class="subtitle">10,000 Sensor Environmental Monitoring System</p>
+            </div>
+        </div>
+    </header>
+    <main>
+        <section class="data-section">
+            <div class="section-header">
+                <h2>Sensor Network</h2>
+            </div>
+            <div id="sensorTableContainer">
+                <p class="placeholder-text">Loading sensors...</p>
+            </div>
+        </section>
+        <div id="bootStatus" class="boot-status">Legacy JS not running.</div>
+    </main>
+    <script src="app.legacy.js"></script>
+</body>
+</html>

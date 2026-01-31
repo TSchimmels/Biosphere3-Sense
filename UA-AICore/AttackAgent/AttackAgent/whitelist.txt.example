@@ -1,0 +1,40 @@
+# AttackAgent Whitelist
+# Add authorized target URLs here, one per line
+# Lines starting with # are comments and will be ignored
+# Empty lines are ignored
+#
+# Examples:
+# http://localhost:3000
+# https://staging.example.com
+# http://localhost:5285
+# https://aicore-app-server.tra220030.projects.jetstream-cloud.org/david-websitetest/
+#
+# IMPORTANT: Only add URLs you own or have explicit permission to test
+# Unauthorized testing may violate laws and regulations
+#
+# Format: One URL per line (with or without trailing slash)
+# Supports: http://, https://, localhost, IP addresses, domains
+#
+# Copy this file to whitelist.txt and add your authorized URLs
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,100 @@
+# =========================
+# .NET / ASP.NET Core
+# =========================
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+project.lock.json
+project.fragment.lock.json
+artifacts/
+*.nuget.props
+*.nuget.targets
+*.nupkg
+
+# =========================
+# Secrets & credentials
+# =========================
+appsettings.Development.json
+appsettings.Production.json
+appsettings.Staging.json
+*.pfx
+*.key
+*.pem
+secrets.json
+.env
+.env.*
+
+# =========================
+# IDE / Editor
+# =========================
+.vs/
+.vscode/
+*.swp
+*.swo
+*~
+.idea/
+
+# =========================
+# Tool config (local only)
+# =========================
+.claude/
+.serena/
+
+# =========================
+# OS files
+# =========================
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# =========================
+# UA-AICore subprojects
+# (separate repos — only AttackAgent is part of this work plan)
+# =========================
+UA-AICore/ai-core-website-v2/
+UA-AICore/aicore-website/
+UA-AICore/CRUD-Fundamentals/
+UA-AICore/dr-kennedy-chatbot/
+UA-AICore/Emergency-Room-Simulator-Repository/
+UA-AICore/Imagination-Engine/
+UA-AICore/learning-vault/
+UA-AICore/MetaHumans-XR/
+UA-AICore/open-webui/
+UA-AICore/PCVC/
+UA-AICore/PCVC-Web-App/
+UA-AICore/Pima-County-XR/
+UA-AICore/Pima-Plane-Classifier/
+UA-AICore/RAGHUB/
+UA-AICore/Scan-2-VR/
+UA-AICore/Scientific-XR/
+UA-AICore/splat-map-xr/
+UA-AICore/UE5-AI-Core-Digital-Twin-Playground/
+UA-AICore/UE5-Skybox-Integration/
+UA-AICore/VR_Test/
+UA-AICore/WebCamGPT-and-the-Holy-Grail/
+UA-AICore/WebXRRD/
+UA-AICore/Westmont-XR/
+UA-AICore/XR-Balldrop/
+UA-AICore/XR-for-Health-Innovation/
+
+# AttackAgent build artifacts (source IS tracked)
+UA-AICore/AttackAgent/AttackAgent/bin/
+UA-AICore/AttackAgent/AttackAgent/obj/
+UA-AICore/AttackAgent/AttackAgent/.git/
+UA-AICore/AttackAgent/.git/
+
+# AttackAgent intermediate scan reports (keep only final)
+UA-AICore/AttackAgent/AttackAgent/reports/optimized/
+UA-AICore/AttackAgent/AttackAgent/reports/pdf/
+UA-AICore/AttackAgent/AttackAgent/vulnerability_database.db
+UA-AICore/AttackAgent/AttackAgent/whitelist.txt.sha256
+
+# =========================
+# Misc
+# =========================
+mssql
+*.db
+*.sqlite

@@ -1,0 +1,337 @@
+# Common API endpoint wordlist
+# This file contains common API endpoint patterns
+# Expand this with application-specific API patterns
+
+# Version endpoints
+/api/v1
+/api/v2
+/api/v3
+/api/v4
+/v1
+/v2
+/v3
+/v4
+
+# Authentication endpoints
+/api/auth
+/api/authentication
+/api/login
+/api/logout
+/api/signin
+/api/signout
+/api/register
+/api/registration
+/api/signup
+/api/token
+/api/refresh
+/api/verify
+/api/validate
+/api/oauth
+/api/oauth2
+
+# User management
+/api/users
+/api/user
+/api/profile
+/api/profiles
+/api/account
+/api/accounts
+/api/member
+/api/members
+/api/customer
+/api/customers
+
+# Admin endpoints
+/api/admin
+/api/administrator
+/api/management
+/api/control
+
+# System endpoints
+/api/health
+/api/healthcheck
+/api/status
+/api/ready
+/api/live
+/api/metrics
+/api/monitoring
+/api/info
+/api/information
+/api/version
+/api/config
+/api/configuration
+/api/settings
+
+# Data endpoints
+/api/data
+/api/dataset
+/api/datasets
+/api/query
+/api/queries
+/api/search
+/api/filter
+/api/sort
+/api/page
+/api/pages
+
+# CRUD operations
+/api/create
+/api/read
+/api/update
+/api/delete
+/api/list
+/api/get
+/api/post
+/api/put
+/api/patch
+
+# File operations
+/api/files
+/api/file
+/api/upload
+/api/uploads
+/api/download
+/api/downloads
+/api/images
+/api/image
+/api/media
+/api/attachments
+
+# Testing and debugging
+/api/test
+/api/tests
+/api/testing
+/api/debug
+/api/debugging
+/api/echo
+/api/ping
+/api/pong
+
+# GraphQL
+/graphql
+/graph
+/graphiql
+/graphql/query
+/graphql/mutation
+
+# WebSocket
+/ws
+/websocket
+/wss
+/socket
+/socket.io
+
+# RESTful resources
+/api/products
+/api/product
+/api/orders
+/api/order
+/api/categories
+/api/category
+/api/posts
+/api/post
+/api/comments
+/api/comment
+/api/articles
+/api/article
+
+# Search and discovery
+/api/search
+/api/discover
+/api/explore
+/api/browse
+/api/navigate
+
+# Notifications
+/api/notifications
+/api/notification
+/api/alerts
+/api/alert
+/api/messages
+/api/message
+
+# Analytics
+/api/analytics
+/api/stats
+/api/statistics
+/api/reports
+/api/report
+
+# Integration endpoints
+/api/webhook
+/api/webhooks
+/api/callback
+/api/callbacks
+/api/integration
+/api/integrations
+
+# Security endpoints
+/api/security
+/api/permissions
+/api/roles
+/api/access
+/api/audit
+/api/auditlog
+
+# Backup and restore
+/api/backup
+/api/backups
+/api/restore
+/api/export
+/api/import
+
+/api/verify
+/api/validate
+/api/oauth
+/api/oauth2
+
+# User management
+/api/users
+/api/user
+/api/profile
+/api/profiles
+/api/account
+/api/accounts
+/api/member
+/api/members
+/api/customer
+/api/customers
+
+# Admin endpoints
+/api/admin
+/api/administrator
+/api/management
+/api/control
+
+# System endpoints
+/api/health
+/api/healthcheck
+/api/status
+/api/ready
+/api/live
+/api/metrics
+/api/monitoring
+/api/info
+/api/information
+/api/version
+/api/config
+/api/configuration
+/api/settings
+
+# Data endpoints
+/api/data
+/api/dataset
+/api/datasets
+/api/query
+/api/queries
+/api/search
+/api/filter
+/api/sort
+/api/page
+/api/pages
+
+# CRUD operations
+/api/create
+/api/read
+/api/update
+/api/delete
+/api/list
+/api/get
+/api/post
+/api/put
+/api/patch
+
+# File operations
+/api/files
+/api/file
+/api/upload
+/api/uploads
+/api/download
+/api/downloads
+/api/images
+/api/image
+/api/media
+/api/attachments
+
+# Testing and debugging
+/api/test
+/api/tests
+/api/testing
+/api/debug
+/api/debugging
+/api/echo
+/api/ping
+/api/pong
+
+# GraphQL
+/graphql
+/graph
+/graphiql
+/graphql/query
+/graphql/mutation
+
+# WebSocket
+/ws
+/websocket
+/wss
+/socket
+/socket.io
+
+# RESTful resources
+/api/products
+/api/product
+/api/orders
+/api/order
+/api/categories
+/api/category
+/api/posts
+/api/post
+/api/comments
+/api/comment
+/api/articles
+/api/article
+
+# Search and discovery
+/api/search
+/api/discover
+/api/explore
+/api/browse
+/api/navigate
+
+# Notifications
+/api/notifications
+/api/notification
+/api/alerts
+/api/alert
+/api/messages
+/api/message
+
+# Analytics
+/api/analytics
+/api/stats
+/api/statistics
+/api/reports
+/api/report
+
+# Integration endpoints
+/api/webhook
+/api/webhooks
+/api/callback
+/api/callbacks
+/api/integration
+/api/integrations
+
+# Security endpoints
+/api/security
+/api/permissions
+/api/roles
+/api/access
+/api/audit
+/api/auditlog
+
+# Backup and restore
+/api/backup
+/api/backups
+/api/restore
+/api/export
+/api/import

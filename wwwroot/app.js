@@ -570,7 +570,7 @@ function updateThreeSensors(sensors) {
         activeIds.add(sensor.id);
         let mesh = sensorMap.get(sensor.id);
         if (!mesh) {
-            const geometry = new THREE.SphereGeometry(0.6, 8, 8);
+            const geometry = new THREE.SphereGeometry(0.22, 6, 6);
             const material = statusMaterials.Online.clone();
             mesh = new THREE.Mesh(geometry, material);
             mesh.userData = { id: sensor.id };
@@ -588,6 +588,16 @@ function updateThreeSensors(sensors) {
             sensorMap.delete(id);
         }
     }
+}
+
+// Terrain elevation: Biosphere 2 hillside slopes NW(high) → SE(low)
+// Approx 8m (4 units) drop along main axis, 6m (3 units) drop N→S
+function getGroundElevation(x, z) {
+    // x: negative=west/NW (higher), positive=east/SE (lower)
+    // z: negative=north (higher), positive=south (lower)
+    const slopeX = -0.03;  // ~3 units drop over 100 units east
+    const slopeZ = -0.025; // ~2.5 units drop over 100 units south
+    return x * slopeX + z * slopeZ;
 }
 
 function initThreeScene() {
@@ -618,7 +628,7 @@ function initThreeScene() {
     const width = container.clientWidth;
     const height = container.clientHeight;
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 500);
-    camera.position.set(0, 40, 70);
+    camera.position.set(0, 70, 120);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(width, height);
@@ -628,31 +638,63 @@ function initThreeScene() {
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.target.set(0, 4, 5);
+    controls.target.set(0, 6, 20);
     controls.minDistance = 25;
-    controls.maxDistance = 160;
+    controls.maxDistance = 300;
     controls.maxPolarAngle = Math.PI / 2.1;
 
-    const grid = new THREE.GridHelper(120, 40, 0x38bdf8, 0x1f2a3a);
-    grid.position.y = 0;
-    scene.add(grid);
+    // Terrain: Biosphere 2 sits on a hillside sloping NW (high) → SE (low)
+    // In model: negative-x/negative-z = higher, positive-x/positive-z = lower
+    // ~8m drop across 170m main axis, ~6m drop north→south
+    const terrainSize = 250;
+    const terrainSegs = 40;
+    const terrainGeom = new THREE.PlaneGeometry(terrainSize, terrainSize, terrainSegs, terrainSegs);
+    terrainGeom.rotateX(-Math.PI / 2);
+    const pos = terrainGeom.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i), z = pos.getZ(i);
+        pos.setY(i, getGroundElevation(x, z));
+    }
+    terrainGeom.computeVertexNormals();
+    const terrainMat = new THREE.MeshStandardMaterial({
+        color: 0x1a1a28, transparent: true, opacity: 0.6,
+        roughness: 0.95, metalness: 0.0, wireframe: false
+    });
+    const terrain = new THREE.Mesh(terrainGeom, terrainMat);
+    scene.add(terrain);
+    // Grid overlay on terrain
+    const gridGeom = new THREE.PlaneGeometry(terrainSize, terrainSize, 20, 20);
+    gridGeom.rotateX(-Math.PI / 2);
+    const gPos = gridGeom.attributes.position;
+    for (let i = 0; i < gPos.count; i++) {
+        const x = gPos.getX(i), z = gPos.getZ(i);
+        gPos.setY(i, getGroundElevation(x, z) + 0.05);
+    }
+    gridGeom.computeVertexNormals();
+    const gridMesh = new THREE.Mesh(gridGeom, new THREE.MeshBasicMaterial({
+        color: 0x2a4a5a, wireframe: true, transparent: true, opacity: 0.25
+    }));
+    scene.add(gridMesh);
 
-    const ambient = new THREE.AmbientLight(0x94a3b8, 0.7);
+    const ambient = new THREE.AmbientLight(0x94a3b8, 0.6);
     scene.add(ambient);
-    const dir = new THREE.DirectionalLight(0xffffff, 0.9);
-    dir.position.set(20, 30, 10);
+    const dir = new THREE.DirectionalLight(0xfff4e6, 1.0);
+    dir.position.set(25, 35, 15);
     scene.add(dir);
-    const fill = new THREE.DirectionalLight(0x7dd3fc, 0.4);
-    fill.position.set(-20, 10, -30);
+    const fill = new THREE.DirectionalLight(0x7dd3fc, 0.35);
+    fill.position.set(-25, 12, -35);
     scene.add(fill);
+    const rim = new THREE.DirectionalLight(0xa78bfa, 0.2);
+    rim.position.set(0, 5, 40);
+    scene.add(rim);
 
     const sensorGroup = new THREE.Group();
     scene.add(sensorGroup);
 
     const statusMaterials = {
-        Online: new THREE.MeshStandardMaterial({ color: 0x22c55e }),
-        Warning: new THREE.MeshStandardMaterial({ color: 0xfbbf24 }),
-        Offline: new THREE.MeshStandardMaterial({ color: 0xef4444 })
+        Online: new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.15 }),
+        Warning: new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xfbbf24, emissiveIntensity: 0.15 }),
+        Offline: new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 0.15 })
     };
 
     addBiosphereStructures(THREE, scene);
@@ -662,8 +704,12 @@ function initThreeScene() {
     // InstancedMesh for 10k sensors (single draw call)
     let sensorInstances = null;
     try {
-        const instanceGeom = new THREE.SphereGeometry(0.6, 8, 8);
-        const instanceMat = new THREE.MeshStandardMaterial({ color: 0x22c55e });
+        const instanceGeom = new THREE.SphereGeometry(0.22, 8, 8);
+        const instanceMat = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            emissive: 0xaaaaaa,
+            emissiveIntensity: 0.15
+        });
         sensorInstances = new THREE.InstancedMesh(instanceGeom, instanceMat, 12000);
         sensorInstances.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
         sensorInstances.instanceColor = new THREE.InstancedBufferAttribute(
@@ -898,21 +944,39 @@ function drawCircle(ctx, x, y, r) {
 }
 
 function getBiomeZones() {
+    // Scale: 1 unit = 2 meters. Source: Nelson et al. 1993 "Dimensions and volumes of Biosphere 2"
+    // Main axis center at x=0. West → East: Rainforest → Ocean → Marsh → Savanna → Desert
+    // Habitat south of central strip, Agriculture south of habitat. Lungs: west and south.
+    //
+    // Real dimensions (m):                    Model (units, ×2m):
+    // Rainforest:      44×44×28  2000m²       22×22, h=14      → 1936m²
+    // Savanna/Ocean:   84×30×27  2500m²       barrel vault 42×15, h=13.5
+    //   Ocean:                    850m²       14×15             → 840m²
+    //   Marsh:                    450m²       7.5×15            → 450m²
+    //   Savanna:                 1300m²       20.5×15           → 1230m²
+    // Desert:          37×37×23  1400m²       18.5×18.5, h=11.5 → 1369m²
+    // Habitat:         41×25×23  1000m²       20.5×12.5, h=11.5 (north of agriculture, same width)
+    // Agriculture:     41×54×24  2000m²       20.5×27, h=12    (south of habitat, touching)
+    // Lungs:           55m diam (180ft), 15m tall   radius=14
+    //
+    // Layout: Main strip (W→E) at z≈0. Habitat directly south of central barrel vault.
+    // Agriculture directly south of habitat, touching at shared wall.
+    // Source: "The Habitat structure is attached to the north side of the Agricultural Biome" —Pearce
     return [
-        { id: 'rainforest', label: 'Rainforest', x: 0.05, y: 0.08, w: 0.32, h: 0.34,
-          bounds3d: { xMin: -40, xMax: -20, zMin: -8.5, zMax: 8.5, yMin: 0.5, yMax: 10 } },
-        { id: 'ocean', label: 'Ocean', x: 0.38, y: 0.06, w: 0.34, h: 0.26,
-          bounds3d: { xMin: -20, xMax: -7, zMin: -6, zMax: 6, yMin: 0.5, yMax: 8 } },
-        { id: 'marsh', label: 'Marsh/Mangrove', x: 0.72, y: 0.38, w: 0.23, h: 0.22,
-          bounds3d: { xMin: -7, xMax: 3, zMin: -6, zMax: 6, yMin: 0.5, yMax: 8 } },
-        { id: 'savanna', label: 'Savanna', x: 0.42, y: 0.36, w: 0.28, h: 0.26,
-          bounds3d: { xMin: 3, xMax: 20, zMin: -6, zMax: 6, yMin: 0.5, yMax: 8 } },
-        { id: 'desert', label: 'Desert', x: 0.74, y: 0.08, w: 0.21, h: 0.26,
-          bounds3d: { xMin: 22, xMax: 38, zMin: -6.5, zMax: 6.5, yMin: 0.5, yMax: 8 } },
-        { id: 'agriculture', label: 'Agriculture', x: 0.05, y: 0.48, w: 0.30, h: 0.24,
-          bounds3d: { xMin: -22, xMax: -8, zMin: 10, zMax: 24, yMin: 0.5, yMax: 5 } },
-        { id: 'habitat', label: 'Human Habitat', x: 0.05, y: 0.76, w: 0.30, h: 0.18,
-          bounds3d: { xMin: -10, xMax: 2, zMin: 8, zMax: 16, yMin: 0.5, yMax: 3.5 } }
+        { id: 'rainforest', label: 'Rainforest', x: 0.04, y: 0.06, w: 0.22, h: 0.22,
+          bounds3d: { xMin: -43, xMax: -21, zMin: -11, zMax: 11, yMin: 0.5, yMax: 14 } },
+        { id: 'ocean', label: 'Ocean', x: 0.28, y: 0.10, w: 0.16, h: 0.16,
+          bounds3d: { xMin: -21, xMax: -7, zMin: -7.5, zMax: 7.5, yMin: 0.5, yMax: 13.5 } },
+        { id: 'marsh', label: 'Marsh/Mangrove', x: 0.45, y: 0.10, w: 0.09, h: 0.16,
+          bounds3d: { xMin: -7, xMax: 0.5, zMin: -7.5, zMax: 7.5, yMin: 0.5, yMax: 13.5 } },
+        { id: 'savanna', label: 'Savanna', x: 0.55, y: 0.10, w: 0.22, h: 0.16,
+          bounds3d: { xMin: 0.5, xMax: 21, zMin: -7.5, zMax: 7.5, yMin: 0.5, yMax: 13.5 } },
+        { id: 'desert', label: 'Desert', x: 0.78, y: 0.06, w: 0.18, h: 0.22,
+          bounds3d: { xMin: 23, xMax: 41.5, zMin: -9.25, zMax: 9.25, yMin: 0.5, yMax: 11.5 } },
+        { id: 'habitat', label: 'Human Habitat', x: 0.18, y: 0.32, w: 0.24, h: 0.12,
+          bounds3d: { xMin: -13.75, xMax: 6.75, zMin: 7.5, zMax: 20, yMin: 0.5, yMax: 11.5 } },
+        { id: 'agriculture', label: 'Agriculture', x: 0.18, y: 0.44, w: 0.24, h: 0.30,
+          bounds3d: { xMin: -13.75, xMax: 6.75, zMin: 20, zMax: 47, yMin: 0.5, yMax: 12 } }
     ];
 }
 
@@ -1007,66 +1071,204 @@ function drawAxes(ctx, w, h) {
     ctx.restore();
 }
 
+function createFrustumGeom(THREE, topW, topD, botW, botD, h, opts) {
+    // Rectangular frustum (truncated pyramid) with subdivided faces for spaceframe triangulation
+    const { botOffX = 0, botOffZ = 0, topOffX = 0, topOffZ = 0, subdivisions = 4 } = opts || {};
+    const g = new THREE.BufferGeometry();
+    const N = subdivisions;
+
+    // 8 corner positions with offset-aware centers
+    const corners = [
+        [-botW / 2 + botOffX, 0, -botD / 2 + botOffZ],  // 0: bot -x -z
+        [ botW / 2 + botOffX, 0, -botD / 2 + botOffZ],  // 1: bot +x -z
+        [ botW / 2 + botOffX, 0,  botD / 2 + botOffZ],  // 2: bot +x +z
+        [-botW / 2 + botOffX, 0,  botD / 2 + botOffZ],  // 3: bot -x +z
+        [-topW / 2 + topOffX, h, -topD / 2 + topOffZ],  // 4: top -x -z
+        [ topW / 2 + topOffX, h, -topD / 2 + topOffZ],  // 5: top +x -z
+        [ topW / 2 + topOffX, h,  topD / 2 + topOffZ],  // 6: top +x +z
+        [-topW / 2 + topOffX, h,  topD / 2 + topOffZ],  // 7: top -x +z
+    ];
+
+    // 6 faces as quads (4 corner indices each, CCW winding from outside)
+    const faces = [
+        [0, 1, 2, 3],  // bottom (y=0)
+        [4, 7, 6, 5],  // top (y=h)
+        [0, 4, 5, 1],  // front (-z)
+        [2, 6, 7, 3],  // back (+z)
+        [3, 7, 4, 0],  // left (-x)
+        [1, 5, 6, 2],  // right (+x)
+    ];
+
+    const verts = [];
+    const indices = [];
+    let vertOffset = 0;
+
+    for (const face of faces) {
+        const [a, b, c, d] = face.map(i => corners[i]);
+        // Bilinear interpolation: (N+1)^2 vertices per face
+        for (let row = 0; row <= N; row++) {
+            const v = row / N;
+            for (let col = 0; col <= N; col++) {
+                const u = col / N;
+                // Bilinear: lerp(lerp(a,b,u), lerp(d,c,u), v)
+                const x = (1 - v) * ((1 - u) * a[0] + u * b[0]) + v * ((1 - u) * d[0] + u * c[0]);
+                const y = (1 - v) * ((1 - u) * a[1] + u * b[1]) + v * ((1 - u) * d[1] + u * c[1]);
+                const z = (1 - v) * ((1 - u) * a[2] + u * b[2]) + v * ((1 - u) * d[2] + u * c[2]);
+                verts.push(x, y, z);
+            }
+        }
+        // 2*N^2 triangles per face
+        const stride = N + 1;
+        for (let row = 0; row < N; row++) {
+            for (let col = 0; col < N; col++) {
+                const i0 = vertOffset + row * stride + col;
+                const i1 = i0 + 1;
+                const i2 = i0 + stride;
+                const i3 = i2 + 1;
+                indices.push(i0, i1, i2);
+                indices.push(i1, i3, i2);
+            }
+        }
+        vertOffset += stride * stride;
+    }
+
+    g.setIndex(indices);
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
+    g.computeVertexNormals();
+    return g;
+}
+
 function buildPyramid(THREE, glassMat, frameMat, opts) {
-    const { baseX, baseZ, height, px, py, pz } = opts;
+    const { baseX, baseZ, height, px, py, pz, tiers, peakOffsetX = 0, peakOffsetZ = 0 } = opts;
     const group = new THREE.Group();
-    const geom = new THREE.ConeGeometry(1, height, 4);
-    geom.scale(baseX / 2, 1, baseZ / 2);
-    geom.rotateY(Math.PI / 4);
-    const mesh = new THREE.Mesh(geom, glassMat);
-    mesh.position.set(0, height / 2, 0);
-    group.add(mesh);
-    const edges = new THREE.EdgesGeometry(geom);
-    const lines = new THREE.LineSegments(edges, frameMat);
-    lines.position.copy(mesh.position);
-    group.add(lines);
+    // Stepped pyramid (ziggurat) with tapered frustum tiers
+    // Matching real Biosphere 2 spaceframe architecture
+    const numTiers = tiers || 4;
+    const stepH = height / numTiers;
+    let yOff = 0;
+    for (let t = 0; t < numTiers; t++) {
+        const botFrac = 1 - t / numTiers;
+        const topFrac = 1 - (t + 1) / numTiers;
+        const botW = baseX * botFrac, botD = baseZ * botFrac;
+        const topW = baseX * topFrac, topD = baseZ * topFrac;
+        // Cumulative offset per tier for asymmetric peak
+        const botOX = (t / numTiers) * peakOffsetX;
+        const botOZ = (t / numTiers) * peakOffsetZ;
+        const topOX = ((t + 1) / numTiers) * peakOffsetX;
+        const topOZ = ((t + 1) / numTiers) * peakOffsetZ;
+        const geom = createFrustumGeom(THREE, topW, topD, botW, botD, stepH, {
+            botOffX: botOX, botOffZ: botOZ, topOffX: topOX, topOffZ: topOZ
+        });
+        const mesh = new THREE.Mesh(geom, glassMat);
+        mesh.position.set(0, yOff, 0);
+        group.add(mesh);
+        const wire = new THREE.WireframeGeometry(geom);
+        const lines = new THREE.LineSegments(wire, frameMat);
+        lines.position.copy(mesh.position);
+        group.add(lines);
+        yOff += stepH;
+    }
     group.position.set(px, py, pz);
     return group;
 }
 
 function buildBarrelVault(THREE, glassMat, frameMat, opts) {
-    const { radius, length, px, py, pz } = opts;
+    const { height, halfWidth, length, px, py, pz } = opts;
     const group = new THREE.Group();
-    const geom = new THREE.CylinderGeometry(radius, radius, length, 32, 1, true, 0, Math.PI);
+    // Unit half-cylinder, then scale Y=height, Z=halfWidth for elliptical cross-section
+    const geom = new THREE.CylinderGeometry(1, 1, length, 20, 4, true, 0, Math.PI);
     geom.rotateZ(Math.PI / 2);
+    geom.scale(1, height, halfWidth);
     const mesh = new THREE.Mesh(geom, glassMat);
-    mesh.position.set(0, radius, 0);
     group.add(mesh);
-    const edges = new THREE.EdgesGeometry(geom, 15);
-    const lines = new THREE.LineSegments(edges, frameMat);
-    lines.position.copy(mesh.position);
+    const wire = new THREE.WireframeGeometry(geom);
+    const lines = new THREE.LineSegments(wire, frameMat);
     group.add(lines);
-    // End caps
-    const capGeom = new THREE.CircleGeometry(radius, 32, 0, Math.PI);
+    // End caps — elliptical semicircle matching cross-section
+    const capGeom = new THREE.CircleGeometry(1, 16, -Math.PI / 2, Math.PI);
+    capGeom.scale(halfWidth, height, 1);
     const capL = new THREE.Mesh(capGeom, glassMat);
     capL.rotation.y = Math.PI / 2;
-    capL.position.set(-length / 2, radius, 0);
+    capL.position.set(-length / 2, 0, 0);
     group.add(capL);
-    const capR = new THREE.Mesh(capGeom, glassMat);
+    const capWireL = new THREE.WireframeGeometry(capGeom);
+    const capLinesL = new THREE.LineSegments(capWireL, frameMat);
+    capLinesL.rotation.y = Math.PI / 2;
+    capLinesL.position.set(-length / 2, 0, 0);
+    group.add(capLinesL);
+    const capR = capL.clone();
     capR.rotation.y = -Math.PI / 2;
-    capR.position.set(length / 2, radius, 0);
+    capR.position.set(length / 2, 0, 0);
     group.add(capR);
+    const capLinesR = capLinesL.clone();
+    capLinesR.rotation.y = -Math.PI / 2;
+    capLinesR.position.set(length / 2, 0, 0);
+    group.add(capLinesR);
     group.position.set(px, py, pz);
     return group;
 }
 
 function buildAgricultureWing(THREE, glassMat, frameMat, opts) {
-    const { px, py, pz, length, width } = opts;
+    const { px, py, pz, length, width, height } = opts;
     const group = new THREE.Group();
-    const vaultRadius = 2.5;
-    const spacing = width / 3;
-    for (let i = 0; i < 3; i++) {
-        const offsetZ = (i - 1) * spacing;
-        const geom = new THREE.CylinderGeometry(vaultRadius, vaultRadius, length, 16, 1, true, 0, Math.PI);
-        geom.rotateX(Math.PI / 2);
-        const mesh = new THREE.Mesh(geom, glassMat);
-        mesh.position.set(0, vaultRadius, offsetZ);
-        group.add(mesh);
-        const edges = new THREE.EdgesGeometry(geom, 15);
-        const lines = new THREE.LineSegments(edges, frameMat);
-        lines.position.copy(mesh.position);
-        group.add(lines);
+    // Real IAB: "nine intersecting space truss vaults" (Pearce Structures)
+    // Groin vault surface: 3 E-W main vaults × 3 N-S cross-vaults = 9 bays
+    // Single height-field mesh where h(x,z) = max(mainVault(z), crossVault(x))
+    const numMain = 3;   // main vaults running east-west (along X), arching in Z
+    const numCross = 3;  // cross-vaults running north-south (along Z), arching in X
+    const bayZ = width / numMain;    // Z-width of each main vault bay
+    const bayX = length / numCross;  // X-width of each cross-vault bay
+
+    const segsPerBay = 8;
+    const resX = numCross * segsPerBay;
+    const resZ = numMain * segsPerBay;
+    const verts = [];
+    const indices = [];
+
+    for (let iz = 0; iz <= resZ; iz++) {
+        const fz = iz / resZ;
+        const z = (fz - 0.5) * width;
+        // Main vault: semicircular profile in Z within nearest bay
+        const mj = Math.min(Math.floor(fz * numMain), numMain - 1);
+        const mainCenterZ = ((mj + 0.5) / numMain - 0.5) * width;
+        const tz = (z - mainCenterZ) / (bayZ / 2);
+        const hMain = Math.sqrt(Math.max(0, 1 - tz * tz)) * height;
+
+        for (let ix = 0; ix <= resX; ix++) {
+            const fx = ix / resX;
+            const x = (fx - 0.5) * length;
+            // Cross vault: semicircular profile in X within nearest bay
+            const ci = Math.min(Math.floor(fx * numCross), numCross - 1);
+            const crossCenterX = ((ci + 0.5) / numCross - 0.5) * length;
+            const tx = (x - crossCenterX) / (bayX / 2);
+            const hCross = Math.sqrt(Math.max(0, 1 - tx * tx)) * height * 0.85;
+
+            verts.push(x, Math.max(hMain, hCross), z);
+        }
     }
+
+    for (let iz = 0; iz < resZ; iz++) {
+        for (let ix = 0; ix < resX; ix++) {
+            const i0 = iz * (resX + 1) + ix;
+            const i1 = i0 + 1;
+            const i2 = i0 + (resX + 1);
+            const i3 = i2 + 1;
+            indices.push(i0, i1, i2);
+            indices.push(i1, i3, i2);
+        }
+    }
+
+    const geom = new THREE.BufferGeometry();
+    geom.setIndex(indices);
+    geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
+    geom.computeVertexNormals();
+
+    const mesh = new THREE.Mesh(geom, glassMat);
+    group.add(mesh);
+    const wire = new THREE.WireframeGeometry(geom);
+    const lines = new THREE.LineSegments(wire, frameMat);
+    group.add(lines);
+
     group.position.set(px, py, pz);
     return group;
 }
@@ -1074,14 +1276,30 @@ function buildAgricultureWing(THREE, glassMat, frameMat, opts) {
 function buildHabitatBlock(THREE, solidMat, frameMat, opts) {
     const { sx, sy, sz, px, py, pz } = opts;
     const group = new THREE.Group();
-    const geom = new THREE.BoxGeometry(sx, sy, sz);
-    const mesh = new THREE.Mesh(geom, solidMat);
-    mesh.position.set(0, sy / 2, 0);
-    group.add(mesh);
-    const edges = new THREE.EdgesGeometry(geom);
-    const lines = new THREE.LineSegments(edges, frameMat);
-    lines.position.copy(mesh.position);
-    group.add(lines);
+    // "Doubly curved, single-layer space frame shell clad with steel panels and glazing" — Pearce
+    // Low rectangular base (labs/workshops on lower levels)
+    const baseH = sy * 0.3;
+    const baseGeom = new THREE.BoxGeometry(sx, baseH, sz, 4, 2, 4);
+    const baseMesh = new THREE.Mesh(baseGeom, solidMat);
+    baseMesh.position.set(0, baseH / 2, 0);
+    group.add(baseMesh);
+    const baseWire = new THREE.WireframeGeometry(baseGeom);
+    const baseLines = new THREE.LineSegments(baseWire, frameMat);
+    baseLines.position.set(0, baseH / 2, 0);
+    group.add(baseLines);
+    // Doubly curved shell dome (curves in both X and Z directions)
+    const domeH = sy - baseH;
+    const domeGeom = new THREE.SphereGeometry(1, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2);
+    domeGeom.scale(sx / 2, domeH, sz / 2);
+    const domeMat = solidMat.clone();
+    domeMat.opacity = 0.7;
+    const domeMesh = new THREE.Mesh(domeGeom, domeMat);
+    domeMesh.position.set(0, baseH, 0);
+    group.add(domeMesh);
+    const domeWire = new THREE.WireframeGeometry(domeGeom);
+    const domeLines = new THREE.LineSegments(domeWire, frameMat);
+    domeLines.position.set(0, baseH, 0);
+    group.add(domeLines);
     group.position.set(px, py, pz);
     return group;
 }
@@ -1089,7 +1307,7 @@ function buildHabitatBlock(THREE, solidMat, frameMat, opts) {
 function buildLungDome(THREE, glassMat, frameMat, opts) {
     const { radius, px, py, pz } = opts;
     const group = new THREE.Group();
-    const geom = new THREE.SphereGeometry(radius, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+    const geom = new THREE.SphereGeometry(radius, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
     const mesh = new THREE.Mesh(geom, glassMat);
     group.add(mesh);
     const wire = new THREE.WireframeGeometry(geom);
@@ -1109,6 +1327,26 @@ function buildTunnel(THREE, material, from, to) {
     mesh.lookAt(to);
     mesh.rotateX(Math.PI / 2);
     return mesh;
+}
+
+function buildGlassCorridor(THREE, glassMat, frameMat, opts) {
+    const { height, halfWidth, length, px, py, pz, rotY } = opts;
+    const hw = halfWidth || height;
+    const group = new THREE.Group();
+    // Unit half-cylinder scaled to height × halfWidth elliptical cross-section
+    const geom = new THREE.CylinderGeometry(1, 1, length, 12, 2, true, 0, Math.PI);
+    geom.rotateZ(Math.PI / 2);
+    geom.scale(1, height, hw);
+    const mesh = new THREE.Mesh(geom, glassMat);
+    group.add(mesh);
+    const wire = new THREE.WireframeGeometry(geom);
+    const lines = new THREE.LineSegments(wire, new THREE.LineBasicMaterial({
+        color: 0x7eeaff, transparent: true, opacity: 0.25, linewidth: 2
+    }));
+    group.add(lines);
+    group.position.set(px, py, pz);
+    if (rotY) group.rotation.y = rotY;
+    return group;
 }
 
 function createTextSprite(THREE, text) {
@@ -1136,7 +1374,7 @@ function addBiomeLabels(THREE, scene) {
         const b = zone.bounds3d;
         const cx = (b.xMin + b.xMax) / 2;
         const cz = (b.zMin + b.zMax) / 2;
-        const top = b.yMax + 1.5;
+        const top = getGroundElevation(cx, cz) + b.yMax + 1.5;
         const sprite = createTextSprite(THREE, zone.label);
         sprite.position.set(cx, top, cz);
         scene.add(sprite);
@@ -1145,85 +1383,194 @@ function addBiomeLabels(THREE, scene) {
 
 function addBiosphereStructures(THREE, scene) {
     const glassMat = new THREE.MeshPhysicalMaterial({
-        color: 0x38bdf8,
-        transmission: 0.75,
-        opacity: 0.15,
+        color: 0x88ccff,
+        transmission: 0.82,
+        opacity: 0.1,
         transparent: true,
-        roughness: 0.1,
-        metalness: 0.0,
-        depthWrite: false
+        roughness: 0.05,
+        metalness: 0.1,
+        depthWrite: false,
+        side: THREE.DoubleSide
     });
     const frameMat = new THREE.LineBasicMaterial({
-        color: 0x38bdf8,
+        color: 0x7eeaff,
         transparent: true,
-        opacity: 0.35
+        opacity: 0.35,
+        linewidth: 2
     });
     const solidMat = new THREE.MeshStandardMaterial({
-        color: 0x1f2a3a,
+        color: 0x1e293b,
         transparent: true,
-        opacity: 0.85
+        opacity: 0.9,
+        metalness: 0.3,
+        roughness: 0.7
     });
     const undergroundMat = new THREE.MeshStandardMaterial({
-        color: 0x1a1a2e,
+        color: 0x0f172a,
         transparent: true,
         opacity: 0.5
     });
+    const baseMat = new THREE.MeshStandardMaterial({
+        color: 0x334155, metalness: 0.4, roughness: 0.6
+    });
 
-    // Rainforest pyramid (west end)
+    // Derive all positions/sizes from biome zone bounds so structures match footprints
+    const zones = getBiomeZones();
+    const z = (id) => zones.find(zone => zone.id === id);
+    const rf = z('rainforest').bounds3d;
+    const oc = z('ocean').bounds3d;
+    const ma = z('marsh').bounds3d;
+    const sa = z('savanna').bounds3d;
+    const de = z('desert').bounds3d;
+    const ag = z('agriculture').bounds3d;
+    const ha = z('habitat').bounds3d;
+
+    // Helpers to compute center, size, and ground elevation from bounds
+    const cx = (b) => (b.xMin + b.xMax) / 2;
+    const cz = (b) => (b.zMin + b.zMax) / 2;
+    const sx = (b) => b.xMax - b.xMin;
+    const sz = (b) => b.zMax - b.zMin;
+    const gy = (b) => getGroundElevation(cx(b), cz(b));
+
+    // Foundation base: spans rainforest through desert along main axis
+    const mainXMin = rf.xMin, mainXMax = de.xMax;
+    const mainZMin = Math.min(rf.zMin, oc.zMin, de.zMin);
+    const mainZMax = Math.max(rf.zMax, oc.zMax, de.zMax);
+    const mainCx = (mainXMin + mainXMax) / 2, mainCz = (mainZMin + mainZMax) / 2;
+    const mainGy = getGroundElevation(mainCx, mainCz);
+    const mainBase = new THREE.Mesh(
+        new THREE.BoxGeometry(mainXMax - mainXMin, 0.4, mainZMax - mainZMin), baseMat);
+    mainBase.position.set(mainCx, mainGy - 0.2, mainCz);
+    scene.add(mainBase);
+
+    // Agriculture foundation
+    const agriBase = new THREE.Mesh(new THREE.BoxGeometry(sx(ag), 0.4, sz(ag)), baseMat);
+    agriBase.position.set(cx(ag), gy(ag) - 0.2, cz(ag));
+    scene.add(agriBase);
+
+    // Habitat foundation
+    const habBase = new THREE.Mesh(new THREE.BoxGeometry(sx(ha), 0.4, sz(ha)), baseMat);
+    habBase.position.set(cx(ha), gy(ha) - 0.2, cz(ha));
+    scene.add(habBase);
+
+    // Rainforest stepped pyramid — 4-tier ziggurat matching real spaceframe architecture
     scene.add(buildPyramid(THREE, glassMat, frameMat, {
-        baseX: 20, baseZ: 17, height: 13.85, px: -30, py: 0, pz: 0
+        baseX: sx(rf), baseZ: sz(rf), height: rf.yMax,
+        px: cx(rf), py: gy(rf), pz: cz(rf), tiers: 4,
+        peakOffsetX: sx(rf) * 0.25
     }));
 
-    // Central barrel vault (main axis)
+    // Central barrel vault — spans from ocean.xMin to savanna.xMax
+    const vaultXMin = oc.xMin, vaultXMax = sa.xMax;
+    const vaultLength = vaultXMax - vaultXMin;
+    const vaultHalfWidth = Math.max(oc.zMax - oc.zMin, ma.zMax - ma.zMin, sa.zMax - sa.zMin) / 2;
+    const vaultHeight = Math.max(oc.yMax, ma.yMax, sa.yMax);
+    const vaultCx = (vaultXMin + vaultXMax) / 2, vaultCz = (oc.zMin + oc.zMax) / 2;
     scene.add(buildBarrelVault(THREE, glassMat, frameMat, {
-        radius: 6.25, length: 40, px: 0, py: 0, pz: 0
+        height: vaultHeight,
+        halfWidth: vaultHalfWidth,
+        length: vaultLength,
+        px: vaultCx, py: getGroundElevation(vaultCx, vaultCz), pz: vaultCz
     }));
 
-    // Desert pyramid (east end)
+    // Connector: barrel vault → desert pyramid (bridge the gap)
+    const gapStart = sa.xMax, gapEnd = de.xMin;
+    if (gapEnd > gapStart) {
+        const gapCx = (gapStart + gapEnd) / 2;
+        scene.add(buildGlassCorridor(THREE, glassMat, frameMat, {
+            height: Math.min(vaultHeight, de.yMax) * 0.6,
+            halfWidth: Math.min(vaultHalfWidth, sz(de) / 2) * 0.6,
+            length: gapEnd - gapStart + 2,
+            px: gapCx, py: getGroundElevation(gapCx, cz(de)), pz: cz(de)
+        }));
+    }
+
+    // Desert stepped pyramid — 3-tier ziggurat, smaller than rainforest
     scene.add(buildPyramid(THREE, glassMat, frameMat, {
-        baseX: 16, baseZ: 13, height: 11, px: 30, py: 0, pz: 0
+        baseX: sx(de), baseZ: sz(de), height: de.yMax,
+        px: cx(de), py: gy(de), pz: cz(de), tiers: 3,
+        peakOffsetX: -sx(de) * 0.25
     }));
 
-    // Agriculture wing (south, three parallel vaults)
-    scene.add(buildAgricultureWing(THREE, glassMat, frameMat, {
-        px: -15, py: 0, pz: 17, length: 14, width: 14
-    }));
-
-    // Habitat block (south, opaque)
+    // Habitat block — directly south of barrel vault, north of agriculture (shared walls)
     scene.add(buildHabitatBlock(THREE, solidMat, frameMat, {
-        sx: 12, sy: 4, sz: 8, px: -4, py: 0, pz: 12
+        sx: sx(ha), sy: ha.yMax, sz: sz(ha),
+        px: cx(ha), py: gy(ha), pz: cz(ha)
     }));
 
-    // Lung dome 1 (southeast)
+    // Agriculture wing — directly south of habitat, sized to match zone
+    scene.add(buildAgricultureWing(THREE, glassMat, frameMat, {
+        px: cx(ag), py: gy(ag), pz: cz(ag), length: sx(ag), width: sz(ag), height: ag.yMax
+    }));
+
+    // South Lung — 55m diameter (180ft) geodesic dome, south of main structure
+    const lungRadius = 14;
+    const southLungX = (sa.xMax + de.xMin) / 2;
+    const southLungZ = ag.zMax + lungRadius + 3;
+    const slGy = getGroundElevation(southLungX, southLungZ);
     scene.add(buildLungDome(THREE, glassMat, frameMat, {
-        radius: 6.75, px: 25, py: 0, pz: 22
+        radius: lungRadius, px: southLungX, py: slGy, pz: southLungZ
     }));
+    const lungPlateMat = new THREE.MeshStandardMaterial({
+        color: 0x14142a, transparent: true, opacity: 0.55, roughness: 0.95, metalness: 0.0
+    });
+    const southLungPlate = new THREE.Mesh(
+        new THREE.CircleGeometry(lungRadius, 32), lungPlateMat
+    );
+    southLungPlate.rotation.x = -Math.PI / 2;
+    southLungPlate.position.set(southLungX, slGy + 0.05, southLungZ);
+    scene.add(southLungPlate);
 
-    // Lung dome 2 (northwest)
+    // West Lung — 55m diameter geodesic dome, west of rainforest
+    const westLungX = rf.xMin - lungRadius - 2;
+    const wlGy = getGroundElevation(westLungX, 0);
     scene.add(buildLungDome(THREE, glassMat, frameMat, {
-        radius: 6.75, px: -38, py: 0, pz: 15
+        radius: lungRadius, px: westLungX, py: wlGy, pz: 0
     }));
+    const westLungPlate = new THREE.Mesh(
+        new THREE.CircleGeometry(lungRadius, 32), lungPlateMat
+    );
+    westLungPlate.rotation.x = -Math.PI / 2;
+    westLungPlate.position.set(westLungX, wlGy + 0.05, 0);
+    scene.add(westLungPlate);
 
-    // Underground connecting tunnels
+    // Underground tunnels connecting lungs to main structure
     scene.add(buildTunnel(THREE, undergroundMat,
-        new THREE.Vector3(20, -1, 0),
-        new THREE.Vector3(25, -1, 20)
+        new THREE.Vector3(southLungX, slGy - 2, ag.zMax),
+        new THREE.Vector3(southLungX, slGy - 2, southLungZ - lungRadius)
     ));
     scene.add(buildTunnel(THREE, undergroundMat,
-        new THREE.Vector3(-20, -1, 0),
-        new THREE.Vector3(-36, -1, 14)
+        new THREE.Vector3(rf.xMin, wlGy - 2, 0),
+        new THREE.Vector3(westLungX, wlGy - 2, 0)
     ));
 
-    // Technosphere slab (underground platform)
-    const techGeom = new THREE.BoxGeometry(82, 1.5, 18);
+    // Technosphere slab (underground, follows terrain slope)
+    const allXMin = Math.min(mainXMin, ha.xMin, ag.xMin);
+    const allXMax = Math.max(mainXMax, ha.xMax, ag.xMax);
+    const allZMin = mainZMin;
+    const allZMax = Math.max(mainZMax, ha.zMax, ag.zMax);
+    const techWidth = allXMax - allXMin + 4;
+    const techDepth = allZMax - allZMin + 4;
+    const techCx = (allXMin + allXMax) / 2, techCz = (allZMin + allZMax) / 2;
+    const techGy = getGroundElevation(techCx, techCz);
+    const techGeom = new THREE.BoxGeometry(techWidth, 2, techDepth);
     const techMesh = new THREE.Mesh(techGeom, new THREE.MeshStandardMaterial({
-        color: 0x1a1a2e, transparent: true, opacity: 0.6
+        color: 0x0f172a, transparent: true, opacity: 0.5, metalness: 0.3, roughness: 0.8
     }));
-    techMesh.position.set(0, -1.25, 0);
+    techMesh.position.set(techCx, techGy - 1.5, techCz);
     scene.add(techMesh);
 }
 
 function addBiomePlates(THREE, scene) {
+    const biomeColors = {
+        rainforest: 0x1a1a2e,
+        ocean: 0x16213e,
+        marsh: 0x1a1a3a,
+        savanna: 0x1e1e36,
+        desert: 0x22203a,
+        agriculture: 0x18182e,
+        habitat: 0x12121e
+    };
     const zones = getBiomeZones();
     zones.forEach((zone) => {
         const b = zone.bounds3d;
@@ -1231,12 +1578,16 @@ function addBiomePlates(THREE, scene) {
         const sizeZ = b.zMax - b.zMin;
         const cx = (b.xMin + b.xMax) / 2;
         const cz = (b.zMin + b.zMax) / 2;
+        const color = biomeColors[zone.id] || 0x0b1220;
         const plate = new THREE.Mesh(
             new THREE.PlaneGeometry(sizeX, sizeZ),
-            new THREE.MeshStandardMaterial({ color: 0x0b1220, transparent: true, opacity: 0.65 })
+            new THREE.MeshStandardMaterial({
+                color: color, transparent: true, opacity: 0.55,
+                roughness: 0.95, metalness: 0.0
+            })
         );
         plate.rotation.x = -Math.PI / 2;
-        plate.position.set(cx, 0.05, cz);
+        plate.position.set(cx, getGroundElevation(cx, cz) + 0.05, cz);
         scene.add(plate);
     });
 }
@@ -1244,28 +1595,39 @@ function addBiomePlates(THREE, scene) {
 function mapSensorTo3D(sensor) {
     const zone = pickBiomeZone(sensor, getBiomeZones());
     const b = zone.bounds3d;
-    const cx = (b.xMin + b.xMax) / 2;
-    const cz = (b.zMin + b.zMax) / 2;
-    const spanX = (b.xMax - b.xMin) * 0.7;
-    const spanZ = (b.zMax - b.zMin) * 0.7;
-    const jitterX = ((sensor.posX % 10) - 5) / 5 * (spanX / 2);
-    const jitterZ = ((sensor.posY % 10) - 5) / 5 * (spanZ / 2);
-    const height = Math.max(b.yMin, Math.min(b.yMax, sensor.posZ * 0.3 + (b.yMin + b.yMax) / 2));
-    return new threeState.THREE.Vector3(cx + jitterX, height, cz + jitterZ);
+    const zCx = (b.xMin + b.xMax) / 2;
+    const zCz = (b.zMin + b.zMax) / 2;
+    const halfX = (b.xMax - b.xMin) / 2;
+    const halfZ = (b.zMax - b.zMin) / 2;
+    // Scatter sensors within 70% of the zone footprint
+    const jitterX = ((sensor.posX % 10) - 5) / 5 * halfX * 0.7;
+    const jitterZ = ((sensor.posY % 10) - 5) / 5 * halfZ * 0.7;
+    // Compute how far this sensor is from the zone center (0=center, 1=edge)
+    const dx = halfX > 0 ? Math.abs(jitterX) / halfX : 0;
+    const dz = halfZ > 0 ? Math.abs(jitterZ) / halfZ : 0;
+    const edgeDist = Math.max(dx, dz);
+    // Reduce max height near edges so sensors stay inside tapered structures
+    // Center: up to 85% of yMax, Edge: down to ~30% of yMax
+    const taper = 0.85 - edgeDist * 0.55;
+    const maxH = b.yMin + (b.yMax - b.yMin) * taper;
+    const rawH = sensor.posZ * 0.3 + (b.yMin + b.yMax) / 2;
+    const height = Math.max(b.yMin, Math.min(maxH, rawH));
+    const groundY = getGroundElevation(zCx + jitterX, zCz + jitterZ);
+    return new threeState.THREE.Vector3(zCx + jitterX, groundY + height, zCz + jitterZ);
 }
 
 function pulseSensors(group) {
     const now = Date.now() * 0.002;
-    // InstancedMesh pulse: scale the whole mesh subtly
+    // InstancedMesh: pulse emissive glow instead of scaling (prevents position drift)
     if (threeState && threeState.sensorInstances) {
-        const scale = 1 + Math.sin(now) * 0.03;
-        threeState.sensorInstances.scale.set(scale, scale, scale);
+        const intensity = 0.12 + Math.sin(now) * 0.08;
+        threeState.sensorInstances.material.emissiveIntensity = intensity;
         return;
     }
-    // Legacy fallback: pulse individual meshes
+    // Legacy fallback: pulse emissive on individual meshes
     group.children.forEach((mesh, idx) => {
-        const scale = 1 + Math.sin(now + idx) * 0.05;
-        mesh.scale.set(scale, scale, scale);
+        const intensity = 0.12 + Math.sin(now + idx * 0.5) * 0.08;
+        if (mesh.material) mesh.material.emissiveIntensity = intensity;
     });
 }
 
